@@ -1,112 +1,63 @@
-def load_data(ticker, n_steps=50, scale=True, shuffle=True, lookup_step=1, split_by_date=True,
-                test_size=0.2, feature_columns=['adjclose', 'volume', 'open', 'high', 'low']):
-    """
-    Loads data from Yahoo Finance source, as well as scaling, shuffling, normalizing and splitting.
-    Params:
-        ticker (str/pd.DataFrame): the ticker you want to load, examples include AAPL, TESL, etc.
-        n_steps (int): the historical sequence length (i.e window size) used to predict, default is 50
-        scale (bool): whether to scale prices from 0 to 1, default is True
-        shuffle (bool): whether to shuffle the dataset (both training & testing), default is True
-        lookup_step (int): the future lookup step to predict, default is 1 (e.g next day)
-        split_by_date (bool): whether we split the dataset into training/testing by date, setting it 
-            to False will split datasets in a random way
-        test_size (float): ratio for test data, default is 0.2 (20% testing data)
-        feature_columns (list): the list of features to use to feed into the model, default is everything grabbed from yahoo_fin
-    """
-    # see if ticker is already a loaded stock from yahoo finance
-    if isinstance(ticker, str):
-        # load it from yahoo_fin library
-        df = si.get_data(ticker)
-    elif isinstance(ticker, pd.DataFrame):
-        # already loaded, use it directly
-        df = ticker
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+import os
+
+def load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_features=True, save_data=True):
+    # Check if data already exists locally
+    filename = f"{symbol}_data.csv"
+    if os.path.exists(filename):
+        data = pd.read_csv(filename, index_col='Date', parse_dates=True)
     else:
-        raise TypeError("ticker can be either a str or a `pd.DataFrame` instances")
+        # Download data from Yahoo Finance
+        data = yf.download(symbol, start=start_date, end=end_date)
+        # Save data locally
+        if save_data:
+            data.to_csv(filename)
 
-    # this will contain all the elements we want to return from this function
-    result = {}
-    # we will also return the original dataframe itself
-    result['df'] = df.copy()
+    # Handle NaN values
+    data.dropna(inplace=True)
 
-    # make sure that the passed feature_columns exist in the dataframe
-    for col in feature_columns:
-        assert col in df.columns, f"'{col}' does not exist in the dataframe."
+    # Select features
+    features = data.columns
 
-    # add date as a column
-    if "date" not in df.columns:
-        df["date"] = df.index
+    # Scale features if required
+    scalers = {}
+    if scale_features:
+        for feature in features:
+            scaler = MinMaxScaler(feature_range=(0, 1))
+            data[feature] = scaler.fit_transform(data[feature].values.reshape(-1, 1))
+            scalers[feature] = scaler
 
-    if scale:
-        column_scaler = {}
-        # scale the data (prices) from 0 to 1
-        for column in feature_columns:
-            scaler = preprocessing.MinMaxScaler()
-            df[column] = scaler.fit_transform(np.expand_dims(df[column].values, axis=1))
-            column_scaler[column] = scaler
+    # Split data into train and test sets
+    if isinstance(split_ratio, float):
+        train_size = int(len(data) * split_ratio)
+        train_data = data.iloc[:train_size]
+        test_data = data.iloc[train_size:]
+    elif isinstance(split_ratio, str) and split_ratio.lower() == 'date':
+        train_data = data[data.index < end_date]
+        test_data = data[data.index >= end_date]
+    else:
+        train_data, test_data = train_test_split(data, test_size=split_ratio, shuffle=True, random_state=42)
 
-        # add the MinMaxScaler instances to the result returned
-        result["column_scaler"] = column_scaler
+    return train_data, test_data, scalers
 
-    # add the target column (label) by shifting by `lookup_step`
-    df['future'] = df['adjclose'].shift(-lookup_step)
+def main():
+    start_date = '2015-01-01'
+    end_date = '2020-01-01'
+    symbol = 'TSLA'
+    train_data, test_data, scalers = load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_features=True, save_data=True)
 
-    # last `lookup_step` columns contains NaN in future column
-    # get them before droping NaNs
-    last_sequence = np.array(df[feature_columns].tail(lookup_step))
-    
-    # drop NaNs
-    df.dropna(inplace=True)
+    if not train_data.empty and not test_data.empty:
+        print("Data loaded successfully!")
+        print("\nTraining data sample:")
+        print(train_data.head())
+        print("\nTest data sample:")
+        print(test_data.head())
+    else:
+        print("Error: Data not loaded successfully!")
 
-    sequence_data = []
-    sequences = deque(maxlen=n_steps)
-
-    for entry, target in zip(df[feature_columns + ["date"]].values, df['future'].values):
-        sequences.append(entry)
-        if len(sequences) == n_steps:
-            sequence_data.append([np.array(sequences), target])
-
-    # get the last sequence by appending the last `n_step` sequence with `lookup_step` sequence
-    # for instance, if n_steps=50 and lookup_step=10, last_sequence should be of 60 (that is 50+10) length
-    # this last_sequence will be used to predict future stock prices that are not available in the dataset
-    last_sequence = list([s[:len(feature_columns)] for s in sequences]) + list(last_sequence)
-    last_sequence = np.array(last_sequence).astype(np.float32)
-    # add to result
-    result['last_sequence'] = last_sequence
-    
-    # construct the X's and y's
-    X, y = [], []
-    for seq, target in sequence_data:
-        X.append(seq)
-        y.append(target)
-
-    # convert to numpy arrays
-    X = np.array(X)
-    y = np.array(y)
-
-    if split_by_date:
-        # split the dataset into training & testing sets by date (not randomly splitting)
-        train_samples = int((1 - test_size) * len(X))
-        result["X_train"] = X[:train_samples]
-        result["y_train"] = y[:train_samples]
-        result["X_test"]  = X[train_samples:]
-        result["y_test"]  = y[train_samples:]
-        if shuffle:
-            # shuffle the datasets for training (if shuffle parameter is set)
-            shuffle_in_unison(result["X_train"], result["y_train"])
-            shuffle_in_unison(result["X_test"], result["y_test"])
-    else:    
-        # split the dataset randomly
-        result["X_train"], result["X_test"], result["y_train"], result["y_test"] = train_test_split(X, y, 
-                                                                                test_size=test_size, shuffle=shuffle)
-
-    # get the list of test set dates
-    dates = result["X_test"][:, -1, -1]
-    # retrieve test features from the original dataframe
-    result["test_df"] = result["df"].loc[dates]
-    # remove duplicated dates in the testing dataframe
-    result["test_df"] = result["test_df"][~result["test_df"].index.duplicated(keep='first')]
-    # remove dates from the training/testing sets & convert to float32
-    result["X_train"] = result["X_train"][:, :, :len(feature_columns)].astype(np.float32)
-    result["X_test"] = result["X_test"][:, :, :len(feature_columns)].astype(np.float32)
-
-    return result
+if __name__ == "__main__":
+    main()
