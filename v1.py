@@ -6,6 +6,20 @@ from sklearn.model_selection import train_test_split
 import os
 
 def load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_features=True, save_data=True):
+    """
+    Loads and processes the stock market data for a given symbol and date range.
+    Params:
+        symbol (str): Stock ticker symbol.
+        start_date (str): Start date in 'YYYY-MM-DD' format.
+        end_date (str): End date in 'YYYY-MM-DD' format.
+        split_ratio (float/str): Ratio to split train and test data or 'date' to split by date.
+        scale_features (bool): Whether to scale features using MinMaxScaler.
+        save_data (bool): Whether to save the downloaded data locally.
+    Returns:
+        train_data (pd.DataFrame): Training data.
+        test_data (pd.DataFrame): Testing data.
+        scalers (dict): Dictionary of scalers for each feature.
+    """
     # Check if data already exists locally
     filename = f"{symbol}_data.csv"
     if os.path.exists(filename):
