@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import os
@@ -161,7 +162,7 @@ predictions = scalers['Close'].inverse_transform(predictions)
 y_test_scaled = scalers['Close'].inverse_transform(y_test.reshape(-1, 1))
 
 # Check if the model has been trained properly
-plt.figure(figsize=(14, 5))
+plt.figure(figsize=(14, 5)) 
 plt.plot(y_test_scaled, color='black', label='Actual Price')
 plt.plot(predictions, color='green', label='Predicted Price')
 plt.title(f'{symbol} Share Price Prediction')
@@ -169,3 +170,4 @@ plt.xlabel('Time')
 plt.ylabel('Share Price')
 plt.legend()
 plt.show()
+
