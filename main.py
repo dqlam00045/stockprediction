@@ -1,20 +1,16 @@
-from data_loader import load_process_dataset
-from training import train_and_evaluate_model
+# main.py
+from data_handler import load_process_dataset
+from train_evaluate import train_and_evaluate_model
 
-def main():
-    start_date = '2015-01-01'
-    end_date = '2020-01-01'
-    symbol = 'TSLA'
-    train_data, test_data, scalers = load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_features=True, save_data=True)
+start_date = '2015-01-01'
+end_date = '2020-01-01'
+symbol = 'TSLA'
 
-    # Configuration for the layers
-    layer_config = [
-        {'type': 'LSTM', 'units': 50, 'return_sequences': True, 'dropout': 0.2},
-        {'type': 'LSTM', 'units': 50, 'return_sequences': False, 'dropout': 0.2}
-    ]
+train_data, test_data, scalers = load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_features=True, save_data=True)
 
-    # Train and evaluate the model
-    model = train_and_evaluate_model(train_data, test_data, scalers, layer_config, epochs=25, batch_size=32)
+layer_config = [
+    {'type': 'LSTM', 'units': 50, 'return_sequences': True, 'dropout': 0.2},
+    {'type': 'LSTM', 'units': 50, 'return_sequences': False, 'dropout': 0.2}
+]
 
-if __name__ == "__main__":
-    main()
+model = train_and_evaluate_model(train_data, test_data, scalers, layer_config, epochs=25, batch_size=32)

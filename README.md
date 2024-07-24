@@ -3,4 +3,4 @@ Before running the code, make sure you run this command to install the required 
 
 pip install -r requirements.txt
 
-Second version of the AI model.
+Third version of the AI model, with SARIMA implemented.

@@ -1,3 +1,5 @@
+# data_handler.py
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
@@ -8,27 +10,19 @@ def load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_fe
     """
     Loads and processes the stock market data for a given symbol and date range.
     """
-    # Check if data already exists locally
     filename = f"{symbol}_data.csv"
     if os.path.exists(filename):
         data = pd.read_csv(filename, index_col='Date', parse_dates=True)
     else:
-        # Download data from Yahoo Finance
         data = yf.download(symbol, start=start_date, end=end_date)
         if data.empty:
             raise ValueError("No data fetched. Please check the symbol and date range.")
-
-        # Save data locally
         if save_data:
             data.to_csv(filename)
 
-    # Handle NaN values
     data.dropna(inplace=True)
-
-    # Select features
     features = data.columns
 
-    # Scale features if required
     scalers = {}
     if scale_features:
         for feature in features:
@@ -36,7 +30,6 @@ def load_process_dataset(symbol, start_date, end_date, split_ratio=0.8, scale_fe
             data[feature] = scaler.fit_transform(data[feature].values.reshape(-1, 1))
             scalers[feature] = scaler
 
-    # Split data into train and test sets
     if isinstance(split_ratio, float):
         train_size = int(len(data) * split_ratio)
         train_data = data.iloc[:train_size]
