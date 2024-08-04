@@ -3,4 +3,4 @@ Before running the code, make sure you run this command to install the required 
 
 pip install -r requirements.txt
 
-Third version of the AI model, with SARIMA implemented.
+New approach to the model, with Reddit post usage as an example.
